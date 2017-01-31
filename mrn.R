@@ -79,10 +79,10 @@ checkForServer()
 startServer(args=c("-Dwebdriver.chrome.driver=C:/Users/Korytin_Andrey/Documents/R/chromedriver.exe"),
             log = FALSE, invisible = FALSE)
 remDr <- remoteDriver(browserName = "chrome")
-l <- length(kk_)
-coords2 <- data.frame(k = rep(NA, l), x = rep(NA, l), y = rep(NA, l), stringsAsFactors = F)
+#l <- length(kk_)
+#coords2 <- data.frame(k = rep(NA, l), x = rep(NA, l), y = rep(NA, l), stringsAsFactors = F)
 remDr$open(silent = TRUE)
-for(i in 2001:3000) {
+for(i in x) {
         url <- kk_[i]
         remDr$navigate(url)
         Sys.sleep(3)
