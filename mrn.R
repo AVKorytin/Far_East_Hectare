@@ -102,6 +102,9 @@ for(i in x) {
         }
 }
 
+p <- aggregate(p ~ k_, subset(h, k_ %in% coords$k), median)
+coords$p <- p$p
+
 library(rgdal)
 d <- coords[,2:3]
 coordinates(d) <- c("lon", "lat")
@@ -112,17 +115,16 @@ d.ch1903 <- spTransform(d, CRS.new)
 
 require(geosphere)
 require(leaflet)
-coords <- cbind(coords, mercator(coords[,2:3], inverse = T))
-m <- leaflet() %>%
+coords2 <- cbind(coords2, mercator(coords2[,2:3], inverse = T))
+m <- with(coords2, leaflet() %>%
         addTiles() %>%  # Add default OpenStreetMap map tiles
-        addMarkers(lng=174.768, lat=-36.852, popup="The birthplace of R")
+        addMarkers(data = coords, lng=lon, lat=lat, popup=k))
 m
-leaflet(df) %>% addTiles() %>%
-        addCircleMarkers(
-                radius = ~ifelse(type == "ship", 6, 10),
-                color = ~pal(type),
-                stroke = FALSE, fillOpacity = 0.5
-        )
+f <- sp::SpatialPointsDataFrame(coords[,4:5], coords[,c(1,6,7)])
+
+leaflet(f) %>% addTiles() %>%
+        addCircleMarkers(radius = ~sqrt(n), stroke = F, color = "red", fillOpacity = ~.5)
+
 
 
 
