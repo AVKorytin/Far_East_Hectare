@@ -72,59 +72,60 @@ saveRDS(h1, "~/R/dv_sample.RDS")
 saveRDS(df, "~/R/dv_gektar.RDS")
 with(subset(h1, k == "25:19"), qplot(p, geom = "density", fill = use, alpha = 1/3, log = "x"))
 
-kk_ <- paste0("http://pkk5.rosreestr.ru/#text=", gsub(":", "%3A", kk[!(kk %in% coords$k)]), "&type=2&app=search&opened=1")
+paste0("http://pkk5.rosreestr.ru/#text=", gsub(":", "%3A", kk[!(kk %in% coords$k)]), "&type=2&app=search&opened=1")
 
 require(RSelenium)
-checkForServer()
+rsDriver()
 startServer(args=c("-Dwebdriver.chrome.driver=C:/Users/Korytin_Andrey/Documents/R/chromedriver.exe"),
             log = FALSE, invisible = FALSE)
 remDr <- remoteDriver(browserName = "chrome")
-#l <- length(kk_)
-#coords2 <- data.frame(k = rep(NA, l), x = rep(NA, l), y = rep(NA, l), stringsAsFactors = F)
+l <- length(k_)
+coords3 <- data.frame(k = rep(NA, l), x = rep(NA, l), y = rep(NA, l), stringsAsFactors = F)
+k <- levels(factor(h11$kk))[!(levels(factor(h11$kk)) %in% levels(factor(h1$k_)))]
+k_ <- paste0("http://pkk5.rosreestr.ru/#text=", gsub(":","%3A", k), "&type=2&app=search&opened=1")
 remDr$open(silent = TRUE)
-for(i in x) {
-        url <- kk_[i]
+for(i in 2:l) {
+        url <- k_[i]
         remDr$navigate(url)
         Sys.sleep(3)
         a <- remDr$getCurrentUrl()
-        coords2$k[i] <- gsub("%3A", ":", gsub("(.*text=)|(&type=.*)", "", a[[1]]))
-        coords2$x[i] <- gsub("(.*x=)|(&y=.*)", "", a[[1]])
-        coords2$y[i] <- gsub("(.*y=)|(&z=.*)", "", a[[1]])
+        coords3$k[i] <- gsub("%3A", ":", gsub("(.*text=)|(&type=.*)", "", a[[1]]))
+        coords3$x[i] <- gsub("(.*x=)|(&y=.*)", "", a[[1]])
+        coords3$y[i] <- gsub("(.*y=)|(&z=.*)", "", a[[1]])
         print(i)
-        if (coords2$x[i]==coords2$x[i-1] | nchar(coords2$x[i]) > 22) {
+        if (coords3$x[i]==coords3$x[i-1] | nchar(coords3$x[i]) > 22) {
                 remDr$refresh()
+                remDr$navigate(url)
                 Sys.sleep(3)
                 a <- remDr$getCurrentUrl()
-                coords2$k[i] <- gsub("%3A", ":", gsub("(.*text=)|(&type=.*)", "", a[[1]]))
-                coords2$x[i] <- gsub("(.*x=)|(&y=.*)", "", a[[1]])
-                coords2$y[i] <- gsub("(.*y=)|(&z=.*)", "", a[[1]])
+                coords3$k[i] <- gsub("%3A", ":", gsub("(.*text=)|(&type=.*)", "", a[[1]]))
+                coords3$x[i] <- gsub("(.*x=)|(&y=.*)", "", a[[1]])
+                coords3$y[i] <- gsub("(.*y=)|(&z=.*)", "", a[[1]])
                 print(i)
         }
 }
-
-p <- aggregate(p ~ k_, subset(h, k_ %in% coords$k), median)
-coords$p <- p$p
-
-library(rgdal)
-d <- coords[,2:3]
-coordinates(d) <- c("lon", "lat")
-proj4string(d) <- CRS("+init=epsg:3857") # WGS 84
-CRS.new <- CRS("+proj=somerc +lat_0=46.9524056 +lon_0=7.43958333 +ellps=bessel 
-               +x_0=2600000 +y_0=1200000 +towgs84=674.374,15.056,405.346 +units=m +k_0=1 +no_defs")
-d.ch1903 <- spTransform(d, CRS.new)
-
+coords0 <- rbind(coords[,1:3], coords2[,1:3], coords1)
 require(geosphere)
+coords0 <- cbind(coords0[,1:3], mercator(coords0[,2:3], inverse = T))
+saveRDS(coords0, "coords0.Rds")
+
+p <- aggregate(p ~ k, subset(h, k %in% coords0$k), median)
+v <- aggregate(v ~ k, subset(h, k %in% coords0$k), length)
+f <- merge(merge(coords0, p, by = "k"), v, by = "k")[-6657,]
+saveRDS(f, "land_parcels_deals.Rds")
+saveRDS(df, "initial_data.Rds")
+saveRDS(h, "filtred_data.Rds")
+
 require(leaflet)
-coords2 <- cbind(coords2, mercator(coords2[,2:3], inverse = T))
-m <- with(coords2, leaflet() %>%
-        addTiles() %>%  # Add default OpenStreetMap map tiles
-        addMarkers(data = coords, lng=lon, lat=lat, popup=k))
-m
-f <- sp::SpatialPointsDataFrame(coords[,4:5], coords[,c(1,6,7)])
-
-leaflet(f) %>% addTiles() %>%
-        addCircleMarkers(radius = ~sqrt(n), stroke = F, color = "red", fillOpacity = ~.5)
-
-
+ff <- sp::SpatialPointsDataFrame(f[,4:5], f[,c(1,6,7)])
+#ff$p <- log(ff$p)
+f09 <- function(x) ifelse(x>0, ifelse(x<9, x, 9), 0)
+pal <- colorNumeric("YlOrRd", f09(ff$p))
+m <- leaflet(ff) %>% addTiles() %>%
+        addCircleMarkers(radius = ~sqrt(4*v), stroke = F, color = ~pal(f09(p)),
+                         fillOpacity = ~.5, popup = ~paste(k, round(exp(p)), sep = " ~ "))
+m %>% addLegend("bottomright", pal = pal, values = ~f09(p), title = "Median parcels' price, RUB/sq.m",
+                labFormat = labelFormat(suffix=" RUB", transform = function(x) round(exp(f09(x))),
+                                        big.mark = " "), opacity = 1)
 
 
